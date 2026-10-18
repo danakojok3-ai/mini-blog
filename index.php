@@ -1,64 +1,49 @@
 <?php
-require 'config.php';
+declare(strict_types=1);
 
-// READ — fetch all posts, newest first
-$stmt = $pdo->query("SELECT * FROM posts ORDER BY created_at DESC");
-$posts = $stmt->fetchAll();
+require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/helpers.php';
+
+start_session();
+
+// READ: list posts, newest first, with simple pagination.
+$perPage = max(1, (int)(app_config()['per_page'] ?? 5));
+$total   = count_posts();
+$pages   = max(1, (int)ceil($total / $perPage));
+$page    = min(max(1, read_id($_GET['page'] ?? 1) ?: 1), $pages);
+$posts   = get_posts($perPage, ($page - 1) * $perPage);
+
+$pageTitle = 'All posts';
+require __DIR__ . '/includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mini Blog</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <main class="wrap">
+<h1>All posts</h1>
 
-    <?php if (isset($_GET['status']) && $_GET['status'] === 'deleted'): ?>
-      <div class="success-banner">Post deleted.</div>
-    <?php elseif (isset($_GET['status']) && $_GET['status'] === 'saved'): ?>
-      <div class="success-banner">Post saved.</div>
-    <?php endif; ?>
-
-    <div class="page-header">
-      <div>
-        <div class="eyebrow">Mini Blog</div>
-        <h1>All posts</h1>
-      </div>
-      <a href="form.php" class="btn btn-primary">+ New post</a>
+<?php if (!$posts): ?>
+    <div class="card empty">
+        <p>No posts yet.</p>
+        <a class="btn" href="create.php">Write the first post</a>
     </div>
+<?php endif; ?>
 
-    <div class="post-list">
-      <?php if (empty($posts)): ?>
-        <div class="empty-state">No posts yet — create your first one.</div>
-      <?php else: ?>
-        <?php foreach ($posts as $post): ?>
-          <article class="post-card">
-            <h2 class="post-title"><?= htmlspecialchars($post['title']) ?></h2>
-            <div class="post-meta">
-              Posted <?= date('M j, Y \a\t g:i A', strtotime($post['created_at'])) ?>
-              <?php if ($post['updated_at'] !== $post['created_at']): ?>
-                · edited <?= date('M j, Y \a\t g:i A', strtotime($post['updated_at'])) ?>
-              <?php endif; ?>
-            </div>
-            <div class="post-body"><?= nl2br(htmlspecialchars($post['body'])) ?></div>
-            <div class="post-actions">
-              <a href="form.php?id=<?= $post['id'] ?>" class="btn btn-ghost">Edit</a>
-              <form action="delete.php" method="POST" onsubmit="return confirm('Delete this post? This can\'t be undone.');">
-                <input type="hidden" name="id" value="<?= $post['id'] ?>">
-                <button type="submit" class="btn btn-danger">Delete</button>
-              </form>
-            </div>
-          </article>
-        <?php endforeach; ?>
-      <?php endif; ?>
-    </div>
+<?php foreach ($posts as $post): ?>
+    <article class="card post">
+        <h2><a href="view.php?id=<?= (int)$post['id'] ?>"><?= e($post['title']) ?></a></h2>
+        <p class="date"><?= e(format_date($post['created_at'])) ?></p>
+        <p><?= e(excerpt($post['body'])) ?></p>
+        <a class="more" href="view.php?id=<?= (int)$post['id'] ?>">Read more →</a>
+    </article>
+<?php endforeach; ?>
 
-  </main>
-</body>
-</html>
+<?php if ($pages > 1): ?>
+    <nav class="pager" aria-label="Pagination">
+        <?php if ($page > 1): ?>
+            <a class="btn btn-ghost btn-small" href="index.php?page=<?= $page - 1 ?>">← Newer</a>
+        <?php endif; ?>
+        <span>Page <?= $page ?> of <?= $pages ?></span>
+        <?php if ($page < $pages): ?>
+            <a class="btn btn-ghost btn-small" href="index.php?page=<?= $page + 1 ?>">Older →</a>
+        <?php endif; ?>
+    </nav>
+<?php endif; ?>
+
+<?php require __DIR__ . '/includes/footer.php'; ?>

@@ -1,0 +1,2 @@
+# Real database credentials must never be committed.
+config.php
